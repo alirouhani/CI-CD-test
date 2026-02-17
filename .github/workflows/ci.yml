@@ -1,0 +1,23 @@
+name: C++ CI Pipeline
+
+on: [push, pull_request]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Configure CMake
+      # This creates the build directory and prepares the project
+      run: cmake -S . -B build
+
+    - name: Build Project
+      # This compiles your library and the tests
+      run: cmake --build build
+
+    - name: Run Unit Tests
+      # This executes the tests and fails the build if any test fails
+      run: cd build && ctest --output-on-failure
