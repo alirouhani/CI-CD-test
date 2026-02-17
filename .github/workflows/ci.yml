@@ -1,4 +1,4 @@
-name: C++ CI Pipeline
+name: C++ Advanced CI Pipeline
 
 on: [push, pull_request]
 
@@ -10,30 +10,32 @@ jobs:
     - name: Checkout Code
       uses: actions/checkout@v4
 
+    - name: Install Tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y lcov
+
     - name: Configure CMake
-      # This creates the build directory and prepares the project
-      run: cmake -S . -B build
+      # We use Debug mode to ensure line numbers match for Coverage
+      # We enable AddressSanitizer and Coverage flags
+      run: |
+        cmake -S . -B build \
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_CXX_FLAGS="--coverage -fsanitize=address" \
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
 
     - name: Build Project
-      # This compiles your library and the tests
       run: cmake --build build
 
     - name: Run Unit Tests
-      # This executes the tests and fails the build if any test fails
-      run: cd build && ctest --output-on-failure
-
-    - name: Configure CMake with ASan
-      # -fsanitize=address finds memory leaks and buffer overflows
-      run: cmake -S . -B build -DCMAKE_CXX_FLAGS="-fsanitize=address"
-
-    - name: Build and Run with ASan
+      # This runs your gTest and complexity tests
       run: |
-        cmake --build build
-        cd build && ctest --output-on-failure
+        cd build
+        ctest --output-on-failure
 
     - name: Generate Coverage Report
+      # We use --ignore-errors mismatch to skip the gTest macro line-number confusion
       run: |
-        sudo apt-get install lcov
-        lcov --capture --directory . --output-file coverage.info
-        lcov --remove coverage.info '/usr/*' '*/tests/*' --output-file coverage.info
-        lcov --list coverage.info # This prints the % in the console
+        lcov --capture --directory . --output-file coverage.info --ignore-errors mismatch
+        lcov --remove coverage.info '/usr/*' '*/tests/*' '*/_deps/*' --output-file coverage.info --ignore-errors mismatch
+        lcov --list coverage.info
