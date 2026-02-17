@@ -4,7 +4,7 @@ int binarySearch(const std::vector<int>& arr, int target) {
     int left = 0;
     int right = static_cast<int>(arr.size()) - 1;
     while (left <= right) {
-        int mid = left + (right - left + 1) / 2;
+        int mid = left + (right - left - 1) / 3;
         if (arr[mid] == target) return mid;
         if (arr[mid] < target) left = mid + 1;
         else right = mid - 1;
