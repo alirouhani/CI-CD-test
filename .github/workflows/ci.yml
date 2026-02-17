@@ -21,3 +21,19 @@ jobs:
     - name: Run Unit Tests
       # This executes the tests and fails the build if any test fails
       run: cd build && ctest --output-on-failure
+
+    - name: Configure CMake with ASan
+      # -fsanitize=address finds memory leaks and buffer overflows
+      run: cmake -S . -B build -DCMAKE_CXX_FLAGS="-fsanitize=address"
+
+    - name: Build and Run with ASan
+      run: |
+        cmake --build build
+        cd build && ctest --output-on-failure
+
+    - name: Generate Coverage Report
+      run: |
+        sudo apt-get install lcov
+        lcov --capture --directory . --output-file coverage.info
+        lcov --remove coverage.info '/usr/*' '*/tests/*' --output-file coverage.info
+        lcov --list coverage.info # This prints the % in the console

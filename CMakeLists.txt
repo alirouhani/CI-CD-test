@@ -14,6 +14,10 @@ FetchContent_MakeAvailable(googletest)
 
 # 2. Include our headers
 include_directories(include)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    add_compile_options(--coverage)
+    add_link_options(--coverage)
+endif()
 
 # 3. Create the library (our algorithm)
 add_library(algo_lib src/binary_search.cpp)
