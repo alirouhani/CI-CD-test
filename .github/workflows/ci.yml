@@ -39,3 +39,12 @@ jobs:
         lcov --capture --directory . --output-file coverage.info --ignore-errors mismatch
         lcov --remove coverage.info '/usr/*' '*/tests/*' '*/_deps/*' --output-file coverage.info --ignore-errors mismatch
         lcov --list coverage.info
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: binary_search_release.tar.gz
+        name: Release ${{ github.ref_name }}
+        body: "Automated release for version ${{ github.ref_name }}. Includes optimized headers and library."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
