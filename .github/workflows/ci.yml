@@ -17,75 +17,76 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-    - name: Install Tools
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y lcov
+      - name: Install Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lcov
 
-    - name: Configure CMake
-      run: |
-        cmake -S . -B build \
-        -DCMAKE_BUILD_TYPE=Debug \
-        -DCMAKE_CXX_FLAGS="--coverage -fsanitize=address" \
-                                                         -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
+      - name: Configure CMake
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_FLAGS="--coverage -fsanitize=address" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
 
-    - name: Build Project
-      run: cmake --build build
+      - name: Build Project
+        run: cmake --build build
 
-    - name: Run Unit Tests
-      run: |
-        cd build
-        ctest --output-on-failure
+      - name: Run Unit Tests
+        run: |
+          cd build
+          ctest --output-on-failure
 
-    - name: Generate Coverage Report
-      run: |
-        lcov --capture --directory . --output-file coverage.info --ignore-errors mismatch
-        lcov --remove coverage.info '/usr/*' '*/tests/*' '*/_deps/*' --output-file coverage.info --ignore-errors mismatch
-        lcov --list coverage.info
+      - name: Generate Coverage Report
+        run: |
+          lcov --capture --directory . --output-file coverage.info --ignore-errors mismatch
+          lcov --remove coverage.info '/usr/*' '*/tests/*' '*/_deps/*' --output-file coverage.info --ignore-errors mismatch
+          lcov --list coverage.info
 
-        # ---------------------------------------------------------
-        # CD JOB: Multi-OS Packaging and Release
-        # ---------------------------------------------------------
-      deploy:
-        needs: build-and-test
-      if: startsWith(github.ref, 'refs/tags/')
-      strategy:
-        matrix:
-          os: [ubuntu-latest, macos-latest, windows-latest]
+  # ---------------------------------------------------------
+  # CD JOB: Multi-OS Packaging and Release
+  # ---------------------------------------------------------
+  deploy:
+    needs: build-and-test
+    if: startsWith(github.ref, 'refs/tags/')
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
 
-      runs-on: ${{ matrix.os }}
-      permissions:
-        contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      steps:
-        - name: Checkout Code
-          uses: actions/checkout@v4
+      - name: Build Optimized Library
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            # Solve Architecture Mismatch: Create a Universal Binary (Intel + ARM)
+            cmake -S . -B build_release -DCMAKE_BUILD_TYPE=Release \
+                  -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+          else
+            cmake -S . -B build_release -DCMAKE_BUILD_TYPE=Release
+          fi
+          cmake --build build_release
 
-    - name: Build Optimized Library
-      run: |
-        if [ "${{ matrix.os }}" = "macos-latest" ]; then
-        # Tell CMake to build for both Intel and Apple Silicon
-        cmake -S . -B build_release -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
-        else
-        cmake -S . -B build_release -DCMAKE_BUILD_TYPE=Release
-        fi
-        cmake --build build_release
+      - name: Package Release
+        shell: bash
+        run: |
+          mkdir -p dist/include
+          cp include/*.h dist/include/
+          # Find both .a (Linux/Mac) and .lib (Windows) files
+          find build_release -name "*.a" -exec cp {} dist/ \; || true
+          find build_release -name "*.lib" -exec cp {} dist/ \; || true
+          # Create a compressed archive named after the specific OS
+          tar -czvf binary_search_${{ matrix.os }}.tar.gz -C dist .
 
-    - name: Package Release
-      shell: bash
-      run: |
-        mkdir -p dist/include
-        cp include/*.h dist/include/
-        # This find command handles both .a (Unix) and .lib (Windows) files
-        find build_release -name "*.a" -exec cp {} dist/ \; || true
-        find build_release -name "*.lib" -exec cp {} dist/ \; || true
-        # Create a compressed archive named after the OS
-        tar -czvf binary_search_${{ matrix.os }}.tar.gz -C dist .
-
-    - name: Upload to GitHub Releases
-      uses: softprops/action-gh-release@v1
-      with:
-        files: binary_search_${{ matrix.os }}.tar.gz
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload to GitHub Releases
+        uses: softprops/action-gh-release@v1
+        with:
+          files: binary_search_${{ matrix.os }}.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
